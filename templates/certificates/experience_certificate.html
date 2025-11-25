@@ -1,0 +1,48 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Experience Certificate</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .header { text-align: center; margin-bottom: 40px; border: 2px solid #333; padding: 20px; }
+        .content { line-height: 1.8; text-align: justify; }
+        .signature { margin-top: 50px; float: right; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{{ company_name }}</h1>
+        <h2>EXPERIENCE CERTIFICATE</h2>
+    </div>
+    
+    <div class="content">
+        <p>TO WHOM IT MAY CONCERN</p>
+        
+        <p>This is to certify that <strong>{{ employee_name }}</strong> was employed with 
+        {{ company_name }} from {{ start_date | date_format }} to {{ end_date | date_format }}.</p>
+        
+        <p>During the tenure of employment, {{ employee_name }} worked as 
+        <strong>{{ position_title }}</strong> in the {{ department }} department.</p>
+        
+        <p>{{ employee_name }} has shown dedication, professionalism, and commitment to work. 
+        {{ he_she | default('They') }} {{ was_were | default('were') }} a valuable team member and contributed 
+        significantly to our organization.</p>
+        
+        <p>We wish {{ employee_name }} all the best for future endeavors.</p>
+        
+        <p>This certificate is issued upon request for employment purposes.</p>
+        
+        <div class="signature">
+            <p>{{ generation_date }}</p>
+            <br><br><br>
+            <p>{{ hr_manager_name }}<br>
+            HR Manager<br>
+            {{ company_name }}</p>
+            
+            <p>Company Seal: ___________</p>
+        </div>
+    </div>
+</body>
+</html>
+                

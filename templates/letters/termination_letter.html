@@ -1,0 +1,55 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Employment Termination Letter</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .content { line-height: 1.6; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{{ company_name }}</h1>
+        <h2>Employment Termination Notice</h2>
+    </div>
+    
+    <div class="content">
+        <p>{{ generation_date }}</p>
+        
+        <p>Dear {{ employee_name }},</p>
+        
+        <p>This letter serves as formal notification that your employment with 
+        {{ company_name }} will be terminated effective {{ termination_date | date_format }}.</p>
+        
+        <p><strong>Termination Details:</strong></p>
+        <ul>
+            <li>Employee ID: {{ employee_id }}</li>
+            <li>Position: {{ position_title }}</li>
+            <li>Department: {{ department }}</li>
+            <li>Last Working Day: {{ last_working_day | date_format }}</li>
+            <li>Reason: {{ termination_reason }}</li>
+        </ul>
+        
+        {% if final_settlement %}
+        <p><strong>Final Settlement:</strong></p>
+        <ul>
+            <li>Final Salary: {{ final_salary | currency }}</li>
+            <li>Unused Leave: {{ unused_leave_days }} days ({{ unused_leave_amount | currency }})</li>
+            <li>Total Amount: {{ total_settlement | currency }}</li>
+        </ul>
+        {% endif %}
+        
+        <p>Please return all company property including ID cards, equipment, and documents 
+        before your last working day.</p>
+        
+        <p>Thank you for your service to {{ company_name }}.</p>
+        
+        <p>Sincerely,<br><br>
+        {{ hr_manager_name }}<br>
+        HR Manager</p>
+    </div>
+</body>
+</html>
+                

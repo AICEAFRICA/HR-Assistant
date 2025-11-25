@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class HRQueryRouter:
-    """Routes queries to appropriate handlers (RAG vs Analytics)"""
+    """Enhanced HR Query Router with document generation support"""
     
     def __init__(self, gemini_api_key: str = None):
         """Initialize router with both engines"""
@@ -41,6 +41,14 @@ class HRQueryRouter:
                 r'contract expir', r'contract renewal', r'contract end', r'contract status'
             ]
         }
+        
+        # Add document generation patterns
+        self.document_generation_patterns = [
+            r"generate.*(?:letter|document|certificate)",
+            r"create.*(?:offer|termination|experience)",
+            r"prepare.*(?:contract|agreement)",
+            r"draft.*(?:letter|document)"
+        ]
         
         logger.info("HR Query Router initialized")
     
@@ -142,6 +150,49 @@ class HRQueryRouter:
             'reason': 'default_fallback'
         }
     
+    def classify_query(self, query):
+        """Enhanced query classification with document generation"""
+        query_lower = query.lower()
+        
+        # Check for document generation requests
+        for pattern in self.document_generation_patterns:
+            if re.search(pattern, query_lower):
+                return {
+                    'type': 'document_generation',
+                    'data_type': self.identify_document_type(query_lower),
+                    'confidence': 0.95
+                }
+        
+        # Check for explicit data patterns
+        for data_type, patterns in self.data_query_patterns.items():
+            for pattern in patterns:
+                if re.search(pattern, query_lower):
+                    return {
+                        'type': 'data_query',
+                        'data_type': data_type,
+                        'confidence': 0.9
+                    }
+        
+        # Default to document query (RAG)
+        return {
+            'type': 'document_query',
+            'data_type': 'general',
+            'confidence': 0.8
+        }
+    
+    def identify_document_type(self, query):
+        """Identify the type of document to generate"""
+        if any(word in query for word in ['offer', 'hiring', 'employment offer']):
+            return 'offer_letter'
+        elif any(word in query for word in ['termination', 'firing', 'dismissal']):
+            return 'termination_letter'
+        elif any(word in query for word in ['experience', 'certificate', 'service']):
+            return 'experience_certificate'
+        elif any(word in query for word in ['contract', 'agreement']):
+            return 'contract'
+        else:
+            return 'generic_document'
+    
     def handle_data_query(self, query: str, data_type: str) -> Dict:
         """Handle structured data queries"""
         try:
@@ -190,6 +241,103 @@ class HRQueryRouter:
                 'response_type': 'data_query_error',
                 'error': str(e)
             }
+    
+    def handle_document_generation_query(self, query, classification):
+        """Handle document generation requests"""
+        try:
+            doc_type = classification['data_type']
+            
+            response = f"""I can help you generate a {doc_type.replace('_', ' ')}. 
+
+**Available Template:** {doc_type.replace('_', ' ').title()}
+
+To generate this document, I'll need the following information:
+"""
+            
+            # Add template-specific requirements
+            if doc_type == 'offer_letter':
+                response += """
+• Employee name and contact information
+• Position title and department
+• Start date and salary details
+• Employment type (full-time/part-time/contract)
+• HR manager name for signature
+
+**Next Steps:**
+1. Go to the Document Generator tab (HR Personnel only)
+2. Select the Offer Letter template
+3. Fill in the required information
+4. Generate and download your document"""
+            
+            elif doc_type == 'termination_letter':
+                response += """
+• Employee name and ID
+• Position and department
+• Termination date and reason
+• Final settlement details (if applicable)
+• HR manager name for signature
+
+**Next Steps:**
+1. Go to the Document Generator tab (HR Personnel only)
+2. Select the Termination Letter template
+3. Fill in the required information
+4. Generate and download your document"""
+            
+            elif doc_type == 'experience_certificate':
+                response += """
+• Employee name and position
+• Employment start and end dates
+• Department information
+• HR manager name for signature
+
+**Next Steps:**
+1. Go to the Document Generator tab (HR Personnel only)
+2. Select the Experience Certificate template
+3. Fill in the required information
+4. Generate and download your document"""
+            
+            else:
+                response += """
+Please use the Document Generator tab to create this document with the appropriate template."""
+            
+            return {
+                'answer': response,
+                'confidence_score': 0.95,
+                'confidence_level': 'High',
+                'query_type': 'document_generation',
+                'data_type': doc_type,
+                'response_type': 'document_generation_guide',
+                'chunks': [],
+                'sources_used': 0,
+                'routing_metadata': {
+                    'template_available': True,  # Assume templates are available
+                    'document_type': doc_type
+                }
+            }
+        
+        except Exception as e:
+            return {
+                'answer': f"I encountered an error while trying to help with document generation: {str(e)}. Please try again or contact technical support.",
+                'confidence_score': 0.3,
+                'confidence_level': 'Low',
+                'query_type': 'document_generation',
+                'data_type': 'error',
+                'response_type': 'error',
+                'chunks': [],
+                'sources_used': 0
+            }
+    
+    def list_available_templates(self, templates):
+        """Create a formatted list of available templates"""
+        template_list = ""
+        
+        for category, template_list_items in templates.items():
+            if template_list_items:
+                template_list += f"\n**{category.title()}:**\n"
+                for template in template_list_items:
+                    template_list += f"• {template['name'].replace('_', ' ').title()}\n"
+        
+        return template_list if template_list else "• No templates currently available"
     
     def _format_headcount_response(self, query: str, data: Dict) -> Dict:
         """Format headcount data into conversational response"""

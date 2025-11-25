@@ -20,6 +20,30 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Initialize session state variables
+def initialize_session_state():
+    """Initialize all session state variables"""
+    if 'user_role' not in st.session_state:
+        st.session_state.user_role = "Employee"
+    
+    if 'chat_history' not in st.session_state:
+        st.session_state.chat_history = []
+    
+    if 'current_query' not in st.session_state:
+        st.session_state.current_query = ""
+    
+    if 'show_document_generator' not in st.session_state:
+        st.session_state.show_document_generator = False
+    
+    if 'dashboard_last_refresh' not in st.session_state:
+        st.session_state.dashboard_last_refresh = datetime.now()
+    
+    if 'dashboard_data' not in st.session_state:
+        st.session_state.dashboard_data = None
+    
+    if 'employee_data' not in st.session_state:
+        st.session_state.employee_data = None
+
 # Custom CSS for better styling
 st.markdown("""
 <style>
@@ -291,6 +315,12 @@ def setup_hr_sidebar():
         • Appraisal completion tracking
         • Contract expiry monitoring
         
+        **📄 Document Generation:**
+        • Offer letters and contracts
+        • Termination letters
+        • Experience certificates
+        • Custom HR documents
+        
         **🔍 Analytics:**
         • Query routing insights
         • Response quality metrics
@@ -370,6 +400,10 @@ def setup_hr_sidebar():
         st.session_state.current_query = "What are the performance review procedures?"
         st.rerun()
     
+    if st.button("📄 Generate Document", use_container_width=True):
+        st.session_state.show_document_generator = True
+        st.rerun()
+    
     if st.button("⚖️ Compliance Check", use_container_width=True):
         st.session_state.current_query = "What are our current compliance requirements?"
         st.rerun()
@@ -410,94 +444,11 @@ def get_role_specific_questions():
     else:
         return hr_questions
 
-def render_hr_dashboard():
-    """Render HR dashboard tab"""
-    try:
-        dashboard = HRDashboard()
-        dashboard.render_dashboard()
-    except Exception as e:
-        st.error(f"❌ Error loading dashboard: {str(e)}")
-        st.info("💡 Make sure your database connection is working and try refreshing the page.")
-        
-        # Show fallback content
-        st.markdown("## 📊 HR Dashboard")
-        st.info("🔧 Dashboard is currently unavailable. Please check your configuration.")
-        
-        # Show basic info instead
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("System Status", "Online", "✅")
-        with col2:
-            st.metric("Last Updated", "Just now", "🔄")
-        with col3:
-            st.metric("Mode", "Maintenance", "⚠️")
-
-def main():
-    """Main Streamlit app with dashboard support"""
-    
-    # Initialize session state
-    if 'user_role' not in st.session_state:
-        st.session_state.user_role = "Employee"
-    if 'chat_history' not in st.session_state:
-        st.session_state.chat_history = []
-    if 'current_query' not in st.session_state:
-        st.session_state.current_query = ""
-    
-    # Initialize router
-    router = init_query_router()
-    
-    # FIXED: Setup sidebar FIRST, then content
-    show_sources, show_metadata = setup_sidebar()
-    
-    # Main page header
-    st.markdown('<h1 class="main-header">🤖 HR Assistant - AI Powered</h1>', unsafe_allow_html=True)
-    
-    # Role-specific welcome section
-    col1, col2 = st.columns([3, 1])
-    
-    with col1:
-        if st.session_state.user_role == "Employee":
-            st.markdown("""
-            <div class="role-info">
-                <h3>👤 Welcome, Employee!</h3>
-                <p>Get instant answers to your HR questions. Ask about policies, benefits, procedures, and company data.</p>
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.markdown("""
-            <div class="role-info">
-                <h3>🏢 Welcome, HR Professional!</h3>
-                <p>Access advanced HR management features, live analytics, and comprehensive policy information.</p>
-            </div>
-            """, unsafe_allow_html=True)
-    
-    with col2:
-        # Status indicator
-        status_color = "🟢" if 'query_router' in st.session_state else "🔴"
-        st.markdown(f"""
-        <div style="text-align: center; padding: 20px;">
-            <strong>System Status</strong><br>
-            {status_color} Online
-        </div>
-        """, unsafe_allow_html=True)
-    
-    # For HR Personnel, show tab selection
-    if st.session_state.user_role == "HR Personnel":
-        tab1, tab2 = st.tabs(["💬 Chat Assistant", "📊 Live Dashboard"])
-        
-        with tab1:
-            # Chat interface content
-            render_chat_content(router, show_sources, show_metadata)
-        
-        with tab2:
-            # Dashboard interface
-            render_hr_dashboard()
-    else:
-        # For employees, show only chat interface
-        render_chat_content(router, show_sources, show_metadata)
-
-def render_chat_content(router, show_sources, show_metadata):
+def render_chat_interface():
     """Render the chat interface content"""
+    
+    # Get sidebar settings
+    show_sources, show_metadata = setup_sidebar()
     
     st.markdown("---")
     
@@ -547,6 +498,7 @@ def render_chat_content(router, show_sources, show_metadata):
         
         with st.spinner("🤔 Processing your question... Please wait"):
             try:
+                router = init_query_router()
                 response = router.ask(query)
                 
                 # Display response with enhanced information
@@ -625,6 +577,456 @@ def render_chat_content(router, show_sources, show_metadata):
                         if chat['response'].get('query_type'):
                             st.markdown(f"**Type:** {chat['response']['query_type'].replace('_', ' ').title()}")
                         st.markdown("---")
+
+def render_document_generator():
+    """Render document generation interface"""
+    st.markdown("## 📄 Document Generator")
+    st.markdown("*Generate HR documents using organization templates*")
+    
+    try:
+        from document_generator import DocumentGenerator
+        doc_gen = DocumentGenerator()
+        
+        # Install sample templates if none exist
+        templates = doc_gen.get_available_templates()
+        if not any(templates.values()):
+            if st.button("📥 Install Sample Templates"):
+                count = doc_gen.install_sample_templates()
+                st.success(f"✅ Installed {count} sample templates!")
+                st.rerun()
+            st.info("💡 No templates found. Install sample templates to get started.")
+            return
+        
+        # Template selection
+        st.markdown("### 📋 Select Template")
+        
+        # Category tabs
+        categories = [cat for cat, templates_list in templates.items() if templates_list]
+        if categories:
+            selected_category = st.selectbox("Select category:", categories)
+            
+            # Template selection within category
+            category_templates = templates[selected_category]
+            template_options = {t['name']: t for t in category_templates}
+            selected_template_name = st.selectbox("Select template:", list(template_options.keys()))
+            selected_template = template_options[selected_template_name]
+            
+            st.markdown("### 📝 Template Data")
+            
+            # Initialize session state for template data
+            if 'template_data' not in st.session_state:
+                st.session_state.template_data = {}
+            
+            # Dynamic form based on template type
+            if selected_template_name == 'offer_letter':
+                template_data = render_offer_letter_form()
+            elif selected_template_name == 'termination_letter':
+                template_data = render_termination_letter_form()
+            elif selected_template_name == 'experience_certificate':
+                template_data = render_experience_certificate_form()
+            else:
+                template_data = render_generic_form()
+            
+            # Store template data in session state when form is submitted
+            if template_data:
+                st.session_state.template_data = template_data
+                st.success("✅ Template data prepared!")
+            
+            # Output format selection
+            col1, col2 = st.columns(2)
+            with col1:
+                output_format = st.selectbox("Output format:", ['html', 'docx', 'pdf'])
+            with col2:
+                st.write("")  # Spacing
+            
+            # Generate button - only enabled if we have template data
+            generate_enabled = bool(st.session_state.template_data)
+            
+            if st.button("🚀 Generate Document", type="primary", use_container_width=True, disabled=not generate_enabled):
+                if st.session_state.template_data:
+                    with st.spinner("Generating document..."):
+                        try:
+                            result = doc_gen.generate_document(
+                                selected_template_name, 
+                                st.session_state.template_data, 
+                                output_format
+                            )
+                            
+                            if result.get('success', False):
+                                st.success(f"✅ Document generated: {result['filename']}")
+                                
+                                # Show download button based on format
+                                if result['type'] == 'html' and 'content' in result:
+                                    st.download_button(
+                                        label="📥 Download HTML Document",
+                                        data=result['content'],
+                                        file_name=result['filename'],
+                                        mime="text/html"
+                                    )
+                                elif result['type'] == 'docx' and 'content' in result:
+                                    st.download_button(
+                                        label="📥 Download Word Document",
+                                        data=result['content'],
+                                        file_name=result['filename'],
+                                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                    )
+                                elif result['type'] == 'pdf' and 'content' in result:
+                                    st.download_button(
+                                        label="📥 Download PDF Document",
+                                        data=result['content'],
+                                        file_name=result['filename'],
+                                        mime="application/pdf"
+                                    )
+                                
+                                # Show preview for HTML only, info for others
+                                if result['type'] == 'html' and 'content' in result:
+                                    with st.expander("👁️ Document Preview"):
+                                        st.components.v1.html(result['content'], height=600, scrolling=True)
+                                elif result['type'] == 'docx':
+                                    st.info("💡 Word document generated successfully. Use the download button above to save it.")
+                                elif result['type'] == 'pdf':
+                                    st.info("💡 PDF document generated successfully. Use the download button above to save it.")
+                            else:
+                                st.error(f"❌ Generation failed: {result.get('error', 'Unknown error')}")
+                                
+                                # Show installation instructions for PDF if that's the issue
+                                error_msg = result.get('error', '')
+                                if 'PDF generation requires additional libraries' in error_msg:
+                                    st.markdown("### 📦 Installation Instructions")
+                                    st.code("""
+# Install PDF generation libraries (choose one):
+
+# Option 1: WeasyPrint (Recommended - better HTML rendering)
+pip install weasyprint
+
+# Option 2: ReportLab (Lighter weight)
+pip install reportlab
+
+# If you encounter issues with WeasyPrint on Windows:
+# You may need to install GTK+ or use WSL
+                                    """, language="bash")
+                                    
+                                    st.info("💡 After installation, restart your Streamlit app to enable PDF generation.")
+                                
+                                # Debug information
+                                with st.expander("🔍 Debug Information"):
+                                    st.json({
+                                        'template_data': result.get('template_data', {}),
+                                        'template_info': result.get('template_info', {}),
+                                        'error': result.get('error', 'No error info')
+                                    })
+                        
+                        except Exception as e:
+                            st.error(f"❌ Generation failed: {str(e)}")
+                            with st.expander("🔍 Debug Information"):
+                                st.json({
+                                    'template_data': st.session_state.template_data,
+                                    'selected_template': selected_template_name,
+                                    'error': str(e)
+                                })
+                else:
+                    st.warning("⚠️ Please fill in the template data first!")
+            
+            # Show current template data for debugging
+            if st.session_state.template_data:
+                with st.expander("🔍 Current Template Data"):
+                    st.json(st.session_state.template_data)
+        
+    except ImportError:
+        st.error("❌ Document generator not available. Please ensure document_generator.py is in your project.")
+    except Exception as e:
+        st.error(f"❌ Document generator error: {str(e)}")
+
+def render_offer_letter_form():
+    """Render form for offer letter template"""
+    st.markdown("#### 📋 Offer Letter Information")
+    
+    with st.form("offer_letter_form", clear_on_submit=False):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            employee_name = st.text_input("Employee Name*", placeholder="John Doe", key="ol_emp_name")
+            position_title = st.text_input("Position Title*", placeholder="Software Engineer", key="ol_position")
+            department = st.text_input("Department*", placeholder="Engineering", key="ol_dept")
+            employment_type = st.selectbox("Employment Type", ["Full-time", "Part-time", "Contract"], key="ol_emp_type")
+        
+        with col2:
+            start_date = st.date_input("Start Date*", key="ol_start_date")
+            salary = st.number_input("Annual Salary*", min_value=0, value=50000, key="ol_salary")
+            response_deadline = st.date_input("Response Deadline*", key="ol_deadline")
+            hr_manager_name = st.text_input("HR Manager Name*", placeholder="Jane Smith", key="ol_hr_manager")
+        
+        company_name = st.text_input("Company Name", value="Adanian Labs", key="ol_company")
+        
+        submitted = st.form_submit_button("✅ Prepare Template Data", use_container_width=True)
+        
+        if submitted:
+            # Validation
+            required_fields = {
+                'Employee Name': employee_name,
+                'Position Title': position_title,
+                'Department': department,
+                'HR Manager Name': hr_manager_name
+            }
+            
+            missing_fields = [field for field, value in required_fields.items() if not value.strip()]
+            
+            if missing_fields:
+                st.error(f"❌ Please fill in required fields: {', '.join(missing_fields)}")
+                return {}
+            
+            return {
+                'employee_name': employee_name.strip(),
+                'position_title': position_title.strip(),
+                'department': department.strip(),
+                'start_date': start_date.isoformat(),
+                'salary': salary,
+                'employment_type': employment_type,
+                'response_deadline': response_deadline.isoformat(),
+                'hr_manager_name': hr_manager_name.strip(),
+                'company_name': company_name.strip()
+            }
+    
+    return {}
+
+def render_termination_letter_form():
+    """Render form for termination letter template"""
+    st.markdown("#### 📋 Termination Letter Information")
+    
+    with st.form("termination_letter_form", clear_on_submit=False):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            employee_name = st.text_input("Employee Name*", key="tl_emp_name")
+            employee_id = st.text_input("Employee ID*", key="tl_emp_id")
+            position_title = st.text_input("Position Title*", key="tl_position")
+            department = st.text_input("Department*", key="tl_dept")
+        
+        with col2:
+            termination_date = st.date_input("Termination Date*", key="tl_term_date")
+            last_working_day = st.date_input("Last Working Day*", key="tl_last_day")
+            termination_reason = st.text_input("Termination Reason*", key="tl_reason")
+            hr_manager_name = st.text_input("HR Manager Name*", key="tl_hr_manager")
+        
+        # Settlement details
+        st.markdown("#### Final Settlement (Optional)")
+        col3, col4 = st.columns(2)
+        
+        with col3:
+            final_salary = st.number_input("Final Salary", min_value=0, value=0, key="tl_final_salary")
+            unused_leave_days = st.number_input("Unused Leave Days", min_value=0, value=0, key="tl_leave_days")
+        
+        with col4:
+            unused_leave_amount = st.number_input("Leave Amount", min_value=0, value=0, key="tl_leave_amount")
+            total_settlement = st.number_input("Total Settlement", min_value=0, value=0, key="tl_total")
+        
+        company_name = st.text_input("Company Name", value="Adanian Labs", key="tl_company")
+        
+        submitted = st.form_submit_button("✅ Prepare Template Data", use_container_width=True)
+        
+        if submitted:
+            # Validation
+            required_fields = {
+                'Employee Name': employee_name,
+                'Employee ID': employee_id,
+                'Position Title': position_title,
+                'Department': department,
+                'Termination Reason': termination_reason,
+                'HR Manager Name': hr_manager_name
+            }
+            
+            missing_fields = [field for field, value in required_fields.items() if not value.strip()]
+            
+            if missing_fields:
+                st.error(f"❌ Please fill in required fields: {', '.join(missing_fields)}")
+                return {}
+            
+            data = {
+                'employee_name': employee_name.strip(),
+                'employee_id': employee_id.strip(),
+                'position_title': position_title.strip(),
+                'department': department.strip(),
+                'termination_date': termination_date.isoformat(),
+                'last_working_day': last_working_day.isoformat(),
+                'termination_reason': termination_reason.strip(),
+                'hr_manager_name': hr_manager_name.strip(),
+                'company_name': company_name.strip()
+            }
+            
+            # Add settlement data if provided
+            if any([final_salary, unused_leave_days, unused_leave_amount, total_settlement]):
+                data.update({
+                    'final_settlement': True,
+                    'final_salary': final_salary,
+                    'unused_leave_days': unused_leave_days,
+                    'unused_leave_amount': unused_leave_amount,
+                    'total_settlement': total_settlement
+                })
+            
+            return data
+    
+    return {}
+
+def render_experience_certificate_form():
+    """Render form for experience certificate template"""
+    st.markdown("#### 📋 Experience Certificate Information")
+    
+    with st.form("experience_certificate_form", clear_on_submit=False):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            employee_name = st.text_input("Employee Name*", key="ec_emp_name")
+            position_title = st.text_input("Position Title*", key="ec_position")
+            department = st.text_input("Department*", key="ec_dept")
+            hr_manager_name = st.text_input("HR Manager Name*", key="ec_hr_manager")
+        
+        with col2:
+            start_date = st.date_input("Employment Start Date*", key="ec_start_date")
+            end_date = st.date_input("Employment End Date*", key="ec_end_date")
+            he_she = st.selectbox("Pronoun", ["They", "He", "She"], key="ec_pronoun")
+            was_were = st.selectbox("Verb", ["were", "was"], key="ec_verb")
+        
+        company_name = st.text_input("Company Name", value="Adanian Labs", key="ec_company")
+        
+        submitted = st.form_submit_button("✅ Prepare Template Data", use_container_width=True)
+        
+        if submitted:
+            # Validation
+            required_fields = {
+                'Employee Name': employee_name,
+                'Position Title': position_title,
+                'Department': department,
+                'HR Manager Name': hr_manager_name
+            }
+            
+            missing_fields = [field for field, value in required_fields.items() if not value.strip()]
+            
+            if missing_fields:
+                st.error(f"❌ Please fill in required fields: {', '.join(missing_fields)}")
+                return {}
+            
+            return {
+                'employee_name': employee_name.strip(),
+                'position_title': position_title.strip(),
+                'department': department.strip(),
+                'start_date': start_date.isoformat(),
+                'end_date': end_date.isoformat(),
+                'hr_manager_name': hr_manager_name.strip(),
+                'company_name': company_name.strip(),
+                'he_she': he_she,
+                'was_were': was_were
+            }
+    
+    return {}
+
+def render_generic_form():
+    """Render generic form for custom templates"""
+    st.markdown("#### 📋 Generic Document Information")
+    
+    with st.form("generic_form", clear_on_submit=False):
+        st.markdown("#### Basic Information")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            employee_name = st.text_input("Employee Name", key="gf_emp_name")
+            position_title = st.text_input("Position Title", key="gf_position")
+            department = st.text_input("Department", key="gf_dept")
+        
+        with col2:
+            employee_id = st.text_input("Employee ID", key="gf_emp_id")
+            hr_manager_name = st.text_input("HR Manager Name", key="gf_hr_manager")
+            company_name = st.text_input("Company Name", value="Adanian Labs", key="gf_company")
+        
+        # Custom fields
+        st.markdown("#### Custom Fields")
+        custom_data = st.text_area("Custom Data (JSON format)", 
+                                  placeholder='{"field1": "value1", "field2": "value2"}', 
+                                  key="gf_custom")
+        
+        submitted = st.form_submit_button("✅ Prepare Template Data", use_container_width=True)
+        
+        if submitted:
+            data = {
+                'employee_name': employee_name.strip() if employee_name else '',
+                'position_title': position_title.strip() if position_title else '',
+                'department': department.strip() if department else '',
+                'employee_id': employee_id.strip() if employee_id else '',
+                'hr_manager_name': hr_manager_name.strip() if hr_manager_name else '',
+                'company_name': company_name.strip() if company_name else 'Adanian Labs'
+            }
+            
+            # Parse custom data
+            if custom_data.strip():
+                try:
+                    import json
+                    custom_fields = json.loads(custom_data)
+                    data.update(custom_fields)
+                except Exception as e:
+                    st.warning(f"⚠️ Invalid JSON in custom fields: {str(e)}")
+            
+            return data
+    
+    return {}
+
+def main():
+    """Main application function"""
+    # Initialize session state first
+    initialize_session_state()
+    
+    # Initialize services once in session state
+    if 'services_initialized' not in st.session_state:
+        with st.spinner("Initializing HR Assistant..."):
+            st.session_state.hr_dashboard = HRDashboard()
+            st.session_state.services_initialized = True
+    
+    # Main header
+    st.markdown('<h1 class="main-header">🤖 HR Assistant - AI Powered</h1>', unsafe_allow_html=True)
+    
+    # Role information display
+    role_emoji = "👤" if st.session_state.user_role == "Employee" else "🏢"
+    st.markdown(f'<div class="role-info">Current Role: {role_emoji} <strong>{st.session_state.user_role}</strong></div>', unsafe_allow_html=True)
+    
+    # Employee users only see chat interface
+    if st.session_state.user_role == "Employee":
+        render_chat_interface()
+        return
+    
+    # HR Personnel get full navigation including document generator
+    with st.sidebar:
+        st.title("🏢 Adanian Labs")
+        st.markdown("**HR Assistant & Analytics**")
+        st.markdown("---")
+        
+        page = st.radio(
+            "Navigate to:",
+            [
+                "💬 HR Assistant", 
+                "📊 Live Dashboard",
+                "📄 Document Generator"
+            ],
+            index=0
+        )
+        
+        st.markdown("---")
+        st.markdown("### 🔗 Quick Actions")
+        
+        if st.button("🔄 Refresh All Data", use_container_width=True):
+            # Clear all session state data except core settings
+            for key in list(st.session_state.keys()):
+                if key.startswith(('dashboard_', 'employee_', 'chat_')):
+                    del st.session_state[key]
+            if hasattr(st, 'cache_data'):
+                st.cache_data.clear()
+            st.success("✅ Data refreshed!")
+            st.rerun()
+    
+    # Main content area for HR Personnel
+    if page == "💬 HR Assistant":
+        render_chat_interface()
+    elif page == "📊 Live Dashboard":
+        st.session_state.hr_dashboard.render_dashboard()
+    elif page == "📄 Document Generator":
+        render_document_generator()
 
 if __name__ == "__main__":
     main()

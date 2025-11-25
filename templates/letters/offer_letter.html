@@ -1,0 +1,60 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Employment Offer Letter</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .content { line-height: 1.6; }
+        .signature { margin-top: 40px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{{ company_name }}</h1>
+        <h2>Employment Offer Letter</h2>
+    </div>
+    
+    <div class="content">
+        <p>{{ generation_date }}</p>
+        
+        <p>Dear {{ employee_name }},</p>
+        
+        <p>We are pleased to offer you the position of <strong>{{ position_title }}</strong> 
+        in our {{ department }} department at {{ company_name }}.</p>
+        
+        <p><strong>Position Details:</strong></p>
+        <ul>
+            <li>Position: {{ position_title }}</li>
+            <li>Department: {{ department }}</li>
+            <li>Start Date: {{ start_date | date_format }}</li>
+            <li>Salary: {{ salary | currency }}</li>
+            <li>Employment Type: {{ employment_type }}</li>
+        </ul>
+        
+        <p>This offer is contingent upon successful completion of background verification 
+        and reference checks.</p>
+        
+        <p>Please confirm your acceptance by signing and returning this letter by 
+        {{ response_deadline | date_format }}.</p>
+        
+        <p>We look forward to welcoming you to our team!</p>
+        
+        <div class="signature">
+            <p>Sincerely,</p>
+            <br><br>
+            <p>{{ hr_manager_name }}<br>
+            HR Manager<br>
+            {{ company_name }}</p>
+        </div>
+        
+        <hr style="margin-top: 40px;">
+        <p>Employee Acceptance:</p>
+        <p>I accept this offer of employment:</p>
+        <br><br>
+        <p>Signature: _________________ Date: _________</p>
+    </div>
+</body>
+</html>
+                

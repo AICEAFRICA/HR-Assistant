@@ -26,23 +26,37 @@ class HRAnalyticsService:
     def get_current_headcount(self) -> Dict:
         """Get current total headcount with breakdown"""
         try:
-            # Get active employees
+            # Get active employees with error handling
             result = self.supabase.table('people').select(
                 'id, employment_status, org_unit_id, hr_role, started_on'
             ).eq('employment_status', 'active').execute()
             
+            if not result.data:
+                logger.warning("No active employees found in database")
+                return {
+                    'total_headcount': 0,
+                    'by_department': {},
+                    'by_role': {},
+                    'last_updated': datetime.now().isoformat(),
+                    'message': 'No active employees found'
+                }
+            
             employees = result.data
             total_count = len(employees)
             
-            # Department breakdown
+            # Department breakdown with null handling
             dept_result = self.supabase.table('people').select(
                 'org_unit_id, org_unit(name)'
             ).eq('employment_status', 'active').execute()
             
             dept_counts = {}
             for emp in dept_result.data:
-                org_unit = emp.get('org_unit', {})
-                dept_name = org_unit.get('name', 'Unknown') if org_unit else 'Unknown'
+                org_unit = emp.get('org_unit')
+                dept_name = 'Unknown'
+                if org_unit and isinstance(org_unit, dict):
+                    dept_name = org_unit.get('name', 'Unknown')
+                elif org_unit and isinstance(org_unit, list) and len(org_unit) > 0:
+                    dept_name = org_unit[0].get('name', 'Unknown')
                 dept_counts[dept_name] = dept_counts.get(dept_name, 0) + 1
             
             # Role breakdown
@@ -60,7 +74,13 @@ class HRAnalyticsService:
             
         except Exception as e:
             logger.error(f"Error getting headcount: {e}")
-            return {'error': str(e)}
+            return {
+                'error': str(e),
+                'total_headcount': 0,
+                'by_department': {},
+                'by_role': {},
+                'last_updated': datetime.now().isoformat()
+            }
     
     def get_headcount_trends(self, months: int = 6) -> Dict:
         """Get headcount trends over time"""

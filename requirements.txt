@@ -7,3 +7,8 @@ numpy>=1.24.0
 pandas>=2.0.0
 plotly>=5.15.0
 scikit-learn>=1.3.0
+# Option 1: WeasyPrint - Better HTML to PDF conversion
+weasyprint>=59.0
+
+# Option 2: ReportLab - Lightweight PDF generation  
+reportlab>=4.0.0
