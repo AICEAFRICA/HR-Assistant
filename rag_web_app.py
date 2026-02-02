@@ -7,7 +7,7 @@ Role-based Streamlit web interface for HR RAG system with improved UI layout
 import streamlit as st
 import os
 from query_router import HRQueryRouter
-from datetime import datetime
+from datetime import datetime, date
 import json
 from hr_dashboard import HRDashboard
 import time
@@ -43,6 +43,15 @@ def initialize_session_state():
     
     if 'employee_data' not in st.session_state:
         st.session_state.employee_data = None
+    
+    if 'show_leave_request' not in st.session_state:
+        st.session_state.show_leave_request = False
+    
+    if 'show_my_leaves' not in st.session_state:
+        st.session_state.show_my_leaves = False
+    
+    if 'show_leave_management' not in st.session_state:
+        st.session_state.show_leave_management = False
 
 # Custom CSS for better styling
 st.markdown("""
@@ -251,6 +260,18 @@ def setup_employee_sidebar():
     
     st.markdown('<div class="sidebar-section"></div>', unsafe_allow_html=True)
     
+    # Leave Management Section - NEW
+    st.markdown("## 📝 Leave Management")
+    if st.button("📅 Request Leave", use_container_width=True):
+        st.session_state.show_leave_request = True
+        st.rerun()
+    
+    if st.button("📋 My Leave Requests", use_container_width=True):
+        st.session_state.show_my_leaves = True
+        st.rerun()
+    
+    st.markdown('<div class="sidebar-section"></div>', unsafe_allow_html=True)
+    
     # Need More Help Section
     st.markdown("## 📞 Need More Help?")
     with st.expander("📧 Contact Information"):
@@ -390,7 +411,7 @@ def setup_hr_sidebar():
         track_queries = st.checkbox("Track query analytics", value=True)
         export_enabled = st.checkbox("Enable data export", value=True)
     
-    # Quick HR Actions
+    # Quick HR Actions - REMOVED Leave Management from here
     st.markdown("## ⚡ Quick HR Actions")
     if st.button("👥 Employee Onboarding", use_container_width=True):
         st.session_state.current_query = "What is the complete employee onboarding process?"
@@ -968,10 +989,303 @@ def render_generic_form():
     
     return {}
 
+def render_leave_request_form():
+    """Render leave request form for employees"""
+    st.markdown("## 📅 Request Leave")
+    st.markdown("*Submit a new leave request for HR approval*")
+    
+    try:
+        from leave_management import LeaveManagementService
+        leave_service = LeaveManagementService()
+        
+        with st.form("leave_request_form"):
+            st.markdown("### 📝 Leave Request Details")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                employee_name = st.text_input("Full Name*", placeholder="John Doe")
+                employee_email = st.text_input("Email Address*", placeholder="john.doe@adanianlabs.io")
+                leave_type = st.selectbox("Leave Type*", [
+                    "Annual Leave", "Sick Leave", "Personal Leave", 
+                    "Emergency Leave", "Maternity/Paternity Leave", "Study Leave"
+                ])
+            
+            with col2:
+                start_date = st.date_input("Start Date*", min_value=date.today())
+                end_date = st.date_input("End Date*", min_value=start_date if 'start_date' in locals() else date.today())
+                
+                # Calculate days
+                if start_date and end_date:
+                    days_requested = (end_date - start_date).days + 1
+                    st.info(f"📊 Days requested: **{days_requested}**")
+            
+            reason = st.text_area("Reason for Leave*", placeholder="Please provide details about your leave request...")
+            
+            # Submit button
+            submitted = st.form_submit_button("📤 Submit Leave Request", type="primary", use_container_width=True)
+            
+            if submitted:
+                # Validation
+                if not all([employee_name, employee_email, leave_type, start_date, end_date, reason]):
+                    st.error("❌ Please fill in all required fields marked with *")
+                elif start_date > end_date:
+                    st.error("❌ End date must be after start date")
+                else:
+                    # Submit leave request
+                    with st.spinner("Submitting leave request..."):
+                        result = leave_service.create_leave_request(
+                            employee_name=employee_name.strip(),
+                            employee_email=employee_email.strip(),
+                            leave_type=leave_type,
+                            start_date=start_date,
+                            end_date=end_date,
+                            reason=reason.strip()
+                        )
+                    
+                    if result.get('success'):
+                        st.success(f"✅ {result['message']}")
+                        st.balloons()
+                        time.sleep(2)
+                        st.session_state.show_leave_request = False
+                        st.rerun()
+                    else:
+                        st.error(f"❌ Error: {result.get('error')}")
+        
+    except ImportError:
+        st.error("❌ Leave management service not available. Please ensure leave_management.py is in your project.")
+    except Exception as e:
+        st.error(f"❌ Error loading leave request form: {str(e)}")
+
+def render_my_leave_requests():
+    """Render employee's leave requests"""
+    st.markdown("## 📋 My Leave Requests")
+    st.markdown("*View your submitted leave requests and their status*")
+    
+    try:
+        from leave_management import LeaveManagementService
+        leave_service = LeaveManagementService()
+        
+        # Employee email input
+        employee_email = st.text_input("Your Email Address", placeholder="john.doe@adanianlabs.io")
+        
+        if employee_email:
+            with st.spinner("Loading your leave requests..."):
+                leave_requests = leave_service.get_employee_leave_requests(employee_email.strip())
+            
+            if not leave_requests:
+                st.info("📭 No leave requests found for this email address")
+                return
+            
+            st.markdown(f"### 📊 Found {len(leave_requests)} leave requests")
+            
+            # Display leave requests
+            for i, request in enumerate(leave_requests):
+                status = request.get('status', 'unknown')
+                
+                # Status styling
+                if status == 'approved':
+                    status_color = "🟢"
+                    status_style = "success"
+                elif status == 'rejected':
+                    status_color = "🔴"
+                    status_style = "error"
+                else:
+                    status_color = "🟡"
+                    status_style = "warning"
+                
+                with st.expander(f"{status_color} Request #{request.get('id')} - {request.get('leave_type')} ({status.upper()})"):
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.write(f"**📅 Dates:** {request.get('start_date')} to {request.get('end_date')}")
+                        st.write(f"**📊 Days:** {request.get('days_requested')}")
+                        st.write(f"**📝 Reason:** {request.get('reason')}")
+                    
+                    with col2:
+                        st.write(f"**📤 Submitted:** {request.get('request_date', '')[:10]}")
+                        
+                        if status_style == "success":
+                            st.success(f"✅ **APPROVED**")
+                        elif status_style == "error":
+                            st.error(f"❌ **REJECTED**")
+                        else:
+                            st.warning(f"⏳ **PENDING**")
+                        
+                        if request.get('hr_reviewer'):
+                            st.write(f"**👤 Reviewer:** {request.get('hr_reviewer')}")
+        
+    except ImportError:
+        st.error("❌ Leave management service not available.")
+    except Exception as e:
+        st.error(f"❌ Error loading leave requests: {str(e)}")
+
+def render_hr_leave_management():
+    """Render leave management for HR personnel"""
+    st.markdown("## 📅 Leave Management")
+    st.markdown("*Review and manage employee leave requests*")
+    
+    try:
+        from leave_management import LeaveManagementService
+        leave_service = LeaveManagementService()
+        
+        # Tabs for different views
+        tab1, tab2, tab3 = st.tabs(["🔍 Pending Requests", "📊 All Requests", "📈 Statistics"])
+        
+        with tab1:
+            st.markdown("### ⏳ Pending Leave Requests")
+            
+            with st.spinner("Loading pending requests..."):
+                pending_requests = leave_service.get_all_leave_requests(status='pending')
+            
+            if not pending_requests:
+                st.success("✅ No pending leave requests")
+                return
+            
+            for request in pending_requests:
+                with st.expander(f"🟡 {request.get('employee_name')} - {request.get('leave_type')} ({request.get('days_requested')} days)"):
+                    col1, col2 = st.columns([2, 1])
+                    
+                    with col1:
+                        st.write(f"**👤 Employee:** {request.get('employee_name')} ({request.get('employee_email')})")
+                        st.write(f"**📅 Dates:** {request.get('start_date')} to {request.get('end_date')}")
+                        st.write(f"**📝 Reason:** {request.get('reason')}")
+                        st.write(f"**📤 Submitted:** {request.get('request_date', '')[:10]}")
+                        if request.get('emergency_contact'):
+                            st.write(f"**📞 Emergency:** {request.get('emergency_contact')}")
+                    
+                    with col2:
+                        st.markdown("#### 🔧 Actions")
+                        
+                        hr_reviewer = st.text_input("Your Name", key=f"reviewer_{request['id']}", placeholder="HR Manager")
+                        hr_comments = st.text_area("Comments", key=f"comments_{request['id']}", placeholder="Reason for approval/rejection...")
+                        
+                        col_a, col_b = st.columns(2)
+                        with col_a:
+                            if st.button("✅ Approve", key=f"approve_{request['id']}", type="primary"):
+                                if hr_reviewer and hr_comments:
+                                    result = leave_service.update_leave_request_status(
+                                        request['id'], 'approved', hr_comments, hr_reviewer
+                                    )
+                                    if result.get('success'):
+                                        st.success("✅ Request approved!")
+                                        st.rerun()
+                                    else:
+                                        st.error(f"❌ {result.get('error')}")
+                                else:
+                                    st.warning("⚠️ Please fill in your name and comments")
+                        
+                        with col_b:
+                            if st.button("❌ Reject", key=f"reject_{request['id']}", type="secondary"):
+                                if hr_reviewer and hr_comments:
+                                    result = leave_service.update_leave_request_status(
+                                        request['id'], 'rejected', hr_comments, hr_reviewer
+                                    )
+                                    if result.get('success'):
+                                        st.success("✅ Request rejected!")
+                                        st.rerun()
+                                    else:
+                                        st.error(f"❌ {result.get('error')}")
+                                else:
+                                    st.warning("⚠️ Please fill in your name and comments")
+        
+        with tab2:
+            st.markdown("### 📋 All Leave Requests")
+            
+            # Filter options
+            col1, col2 = st.columns(2)
+            with col1:
+                status_filter = st.selectbox("Filter by Status", ["All", "pending", "approved", "rejected"])
+            
+            with col2:
+                limit = st.selectbox("Show", [10, 25, 50, 100], index=1)
+            
+            # Load requests
+            with st.spinner("Loading all requests..."):
+                all_requests = leave_service.get_all_leave_requests(
+                    status=None if status_filter == "All" else status_filter
+                )[:limit]
+            
+            if not all_requests:
+                st.info("📭 No leave requests found")
+                return
+            
+            # Display as table
+            import pandas as pd
+            df_data = []
+            for request in all_requests:
+                status = request.get('status', 'unknown')
+                df_data.append({
+                    'ID': request.get('id'),
+                    'Employee': request.get('employee_name'),
+                    'Email': request.get('employee_email'),
+                    'Type': request.get('leave_type'),
+                    'Start': request.get('start_date'),
+                    'End': request.get('end_date'),
+                    'Days': request.get('days_requested'),
+                    'Status': status.upper(),
+                    'Submitted': request.get('request_date', '')[:10],
+                    'Reviewer': request.get('hr_reviewer', ''),
+                })
+            
+            df = pd.DataFrame(df_data)
+            st.dataframe(df, use_container_width=True, hide_index=True)
+        
+        with tab3:
+            st.markdown("### 📈 Leave Statistics")
+            
+            with st.spinner("Calculating statistics..."):
+                stats = leave_service.get_leave_statistics()
+            
+            if 'error' in stats:
+                st.error(f"❌ Error loading statistics: {stats['error']}")
+                return
+            
+            # Key metrics
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("📊 Total Requests", stats.get('total_requests', 0))
+            with col2:
+                st.metric("⏳ Pending", stats.get('pending_requests', 0))
+            with col3:
+                st.metric("✅ Approved", stats.get('approved_requests', 0))
+            with col4:
+                st.metric("❌ Rejected", stats.get('rejected_requests', 0))
+            
+            # This month's requests
+            st.metric("📅 This Month", stats.get('this_month_requests', 0))
+            
+            # Leave types breakdown
+            leave_types = stats.get('leave_types_breakdown', {})
+            if leave_types:
+                st.markdown("#### 📊 Leave Types Breakdown")
+                
+                import plotly.express as px
+                fig = px.bar(
+                    x=list(leave_types.keys()),
+                    y=list(leave_types.values()),
+                    title="Requests by Leave Type",
+                    labels={'x': 'Leave Type', 'y': 'Number of Requests'}
+                )
+                st.plotly_chart(fig, use_container_width=True)
+        
+    except ImportError:
+        st.error("❌ Leave management service not available.")
+    except Exception as e:
+        st.error(f"❌ Error loading leave management: {str(e)}")
+
 def main():
     """Main application function"""
     # Initialize session state first
     initialize_session_state()
+    
+    # Initialize additional leave-related session state
+    if 'show_leave_request' not in st.session_state:
+        st.session_state.show_leave_request = False
+    if 'show_my_leaves' not in st.session_state:
+        st.session_state.show_my_leaves = False
+    if 'show_leave_management' not in st.session_state:
+        st.session_state.show_leave_management = False
     
     # Initialize services once in session state
     if 'services_initialized' not in st.session_state:
@@ -986,12 +1300,28 @@ def main():
     role_emoji = "👤" if st.session_state.user_role == "Employee" else "🏢"
     st.markdown(f'<div class="role-info">Current Role: {role_emoji} <strong>{st.session_state.user_role}</strong></div>', unsafe_allow_html=True)
     
-    # Employee users only see chat interface
+    # Check for employee-specific leave views
     if st.session_state.user_role == "Employee":
+        # Handle employee leave requests
+        if st.session_state.get('show_leave_request', False):
+            if st.button("← Back to Chat"):
+                st.session_state.show_leave_request = False
+                st.rerun()
+            render_leave_request_form()
+            return
+        
+        if st.session_state.get('show_my_leaves', False):
+            if st.button("← Back to Chat"):
+                st.session_state.show_my_leaves = False
+                st.rerun()
+            render_my_leave_requests()
+            return
+        
+        # Default employee chat interface
         render_chat_interface()
         return
     
-    # HR Personnel get full navigation including document generator
+    # HR Personnel get full navigation including leave management
     with st.sidebar:
         st.title("🏢 Adanian Labs")
         st.markdown("**HR Assistant & Analytics**")
@@ -1002,7 +1332,8 @@ def main():
             [
                 "💬 HR Assistant", 
                 "📊 Live Dashboard",
-                "📄 Document Generator"
+                "📄 Document Generator",
+                "📅 Leave Management"  # MOVED HERE
             ],
             index=0
         )
@@ -1027,6 +1358,8 @@ def main():
         st.session_state.hr_dashboard.render_dashboard()
     elif page == "📄 Document Generator":
         render_document_generator()
+    elif page == "📅 Leave Management":  # ADDED THIS
+        render_hr_leave_management()
 
 if __name__ == "__main__":
     main()
