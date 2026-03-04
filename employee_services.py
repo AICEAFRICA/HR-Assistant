@@ -106,7 +106,6 @@ class EmployeeServicesManager:
                 'grant_date': grant_date.isoformat(),
                 'vesting_period_months': vesting_period_months,
                 'cliff_months': cliff_months,
-                'total_value': shares_count * share_price,
                 'status': 'active'
             }
             
@@ -118,7 +117,8 @@ class EmployeeServicesManager:
                     'success': True,
                     'share_grant_id': result.data[0]['id'],
                     'message': f'{shares_count} shares allocated successfully',
-                    'vesting_period': f'{vesting_period_months} months'
+                    'vesting_period': f'{vesting_period_months} months',
+                    'total_value': result.data[0].get('total_value', shares_count * share_price)
                 }
             else:
                 return {'success': False, 'error': 'Failed to allocate shares'}
@@ -138,7 +138,7 @@ class EmployeeServicesManager:
             person_id = person_result.data[0]['id']
             
             result = self.supabase.table('employee_shares').select(
-                'id, total_shares, vested_shares, share_price, grant_date, vesting_period_months, cliff_months, total_value, status'
+                'id, total_shares, vested_shares, share_price, grant_date, vesting_period_months, cliff_months, status'
             ).eq('person_id', person_id).execute()
             
             return result.data if result.data else []
@@ -298,32 +298,59 @@ class EmployeeServicesManager:
     def get_organization_structure(self, department: str = None) -> List[Dict]:
         """Get governance structure for organization or department"""
         try:
-            query = self.supabase.table('role_assignments').select('''
-                id, assignment_date, status,
-                people!role_assignments_person_id_fkey(first_name, last_name, work_email),
-                governance_roles!role_assignments_role_id_fkey(role_name, department, responsibilities, manager_id)
+            # Query governance_roles directly (shows all roles)
+            query = self.supabase.table('governance_roles').select('''
+                id, role_name, department, responsibilities, manager_id, created_date,
+                manager:people!governance_roles_manager_id_fkey(first_name, last_name, work_email),
+                role_assignments(person_id, people!role_assignments_person_id_fkey(first_name, last_name, work_email))
             ''')
             
             if department:
-                query = query.eq('governance_roles.department', department)
+                query = query.eq('department', department)
             
-            result = query.execute()
+            result = query.order('department').execute()
+            
+            if not result.data:
+                logger.warning(f"No governance roles found for department: {department}")
+                return []
             
             structure = []
-            for item in result.data:
-                person = item.get('people', {})
-                role = item.get('governance_roles', {})
-                structure.append({
-                    'assignment_id': item['id'],
-                    'employee_name': f"{person.get('first_name', '')} {person.get('last_name', '')}".strip(),
-                    'employee_email': person.get('work_email', ''),
-                    'role_name': role.get('role_name', ''),
-                    'department': role.get('department', ''),
-                    'responsibilities': role.get('responsibilities', []),
-                    'assignment_date': item['assignment_date'],
-                    'status': item['status']
-                })
+            for role in result.data:
+                manager = role.get('manager', {})
+                assignments = role.get('role_assignments', [])
+                
+                # If role has assignments, create entry for each assigned person
+                if assignments:
+                    for assignment in assignments:
+                        person = assignment.get('people', {})
+                        structure.append({
+                            'role_id': role['id'],
+                            'role_name': role['role_name'],
+                            'department': role['department'],
+                            'responsibilities': role.get('responsibilities', []),
+                            'employee_name': f"{person.get('first_name', '')} {person.get('last_name', '')}".strip(),
+                            'employee_email': person.get('work_email', ''),
+                            'reports_to_manager': f"{manager.get('first_name', '')} {manager.get('last_name', '')}".strip() if manager else 'Unassigned',
+                            'manager_email': manager.get('work_email') if manager else None,
+                            'assignment_status': 'assigned',
+                            'created_date': role.get('created_date')
+                        })
+                else:
+                    # If role has no assignments, show the role as unassigned
+                    structure.append({
+                        'role_id': role['id'],
+                        'role_name': role['role_name'],
+                        'department': role['department'],
+                        'responsibilities': role.get('responsibilities', []),
+                        'employee_name': None,
+                        'employee_email': None,
+                        'reports_to_manager': f"{manager.get('first_name', '')} {manager.get('last_name', '')}".strip() if manager else 'Unassigned',
+                        'manager_email': manager.get('work_email') if manager else None,
+                        'assignment_status': 'vacant',
+                        'created_date': role.get('created_date')
+                    })
             
+            logger.info(f"Retrieved {len(structure)} organization structure entries")
             return structure
             
         except Exception as e:

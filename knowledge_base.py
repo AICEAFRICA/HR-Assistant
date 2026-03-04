@@ -78,9 +78,10 @@ class HRKnowledgeBaseClient:
             for text in texts:
                 # Use Gemini's embedding model
                 embedding_result = genai.embed_content(
-                    model="models/embedding-001",
+                    model="models/gemini-embedding-001",
                     content=text,
-                    task_type="retrieval_document"
+                    task_type="retrieval_document",
+                    output_dimensionality=768
                 )
                 embeddings.append(embedding_result['embedding'])
             

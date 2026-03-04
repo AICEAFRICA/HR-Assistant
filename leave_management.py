@@ -158,18 +158,19 @@ class LeaveManagementService:
             return []
     
     def update_leave_request_status(self, request_id: str, status: str, 
-                                  hr_comments: str, hr_reviewer: str) -> Dict:
+                                  hr_comments: str = None, hr_reviewer: str = None) -> Dict:
         """Update leave request status (approve/reject) using existing schema"""
         try:
             # Find the HR reviewer by name (simple approach)
             # In a production system, you'd want to use the logged-in user's ID
-            approver_result = self.supabase.table('people').select('id').ilike(
-                'display_name', f'%{hr_reviewer}%'
-            ).limit(1).execute()
-            
             approver_id = None
-            if approver_result.data:
-                approver_id = approver_result.data[0]['id']
+            if hr_reviewer:
+                approver_result = self.supabase.table('people').select('id').ilike(
+                    'display_name', f'%{hr_reviewer}%'
+                ).limit(1).execute()
+                
+                if approver_result.data:
+                    approver_id = approver_result.data[0]['id']
             
             update_data = {'status': status}
             if approver_id:

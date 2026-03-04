@@ -541,28 +541,33 @@ Please use the Document Generator tab to create this document with the appropria
             'data': data
         }
     
-    def ask(self, question: str) -> Dict:
+    def ask(self, query: str, **kwargs) -> Dict:
         """Main query handler - routes to appropriate engine"""
         try:
-            logger.info(f"Routing query: {question}")
+            logger.info(f"Routing query: {query}")
+            
+            # Extract optional parameters
+            is_urgent = kwargs.get('is_urgent', False)
             
             # Analyze query intent
-            query_type, data_type, metadata = self.analyze_query_intent(question)
+            query_type, data_type, metadata = self.analyze_query_intent(query)
             
             logger.info(f"Query routed to: {query_type} ({data_type})")
             
             if query_type == 'data_query':
-                response = self.handle_data_query(question, data_type)
+                response = self.handle_data_query(query, data_type)
                 response['query_type'] = 'data_query'
                 response['data_type'] = data_type
                 response['routing_metadata'] = metadata
+                response['is_urgent'] = is_urgent
                 return response
             else:
                 # Use RAG engine for document queries
-                response = self.rag_engine.ask(question)
+                response = self.rag_engine.ask(query)
                 response['query_type'] = 'document_query'
                 response['data_type'] = data_type
                 response['routing_metadata'] = metadata
+                response['is_urgent'] = is_urgent
                 return response
                 
         except Exception as e:

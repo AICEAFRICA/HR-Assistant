@@ -12,3 +12,7 @@ weasyprint>=59.0
 
 # Option 2: ReportLab - Lightweight PDF generation  
 reportlab>=4.0.0
+fastapi>=0.95.0
+uvicorn[standard]>=0.21.0
+python-multipart>=0.0.5
+pydantic>=1.10.0
