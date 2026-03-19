@@ -1,0 +1,57 @@
+# Virtual Environment - IMPORTANT!
+venv/
+.venv/
+env/
+ENV/
+.env.local
+
+# Git
+.git
+.gitignore
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+*.egg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment files (secrets)
+.env
+.env.local
+.env.*.local
+
+# Logs and generated files
+logs/
+*.log
+generated_documents/*.pdf
+generated_documents/*.docx
+generated_documents/*.html
+
+# Docker
+docker-compose.override.yml
+Dockerfile.local
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Documentation (optional - remove if you want docs in container)
+docs/
+*.md
+
+# Misc
+.DS_Store
+Thumbs.db
+*.bak
+*.tmp
