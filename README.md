@@ -11,7 +11,7 @@ A comprehensive **AI-powered HR Management System** featuring a RAG-based knowle
 | **HR Dashboard** | Live Plotly-powered analytics: headcount, attrition, probation reviews, appraisals, contract alerts |
 | **Performance Analytics** | Quarterly organisational index with weighted scoring across 7 criteria, employee rankings & profiles |
 | **Leave Management** | Full lifecycle — employees request leave, HR approves/rejects with notifications |
-| **Document Generator** | Generate offer letters, termination letters, and experience certificates in HTML, DOCX, or PDF |
+| **Document Generator** | Generate offer letters, termination letters, and experience certificates in HTML, DOCX, or PDF — [see deep dive](#-document-generator--deep-dive) |
 | **Employee Self-Service** | Insurance, stock options, compliance training, governance structure, career development |
 | **Role-Based Access** | Separate Employee and HR Personnel views in the Streamlit frontend |
 
@@ -146,7 +146,236 @@ docker-compose -f docker-compose.dev.yml up
 
 ---
 
-## 📡 API Endpoints
+## � Document Generator — Deep Dive
+
+The Document Generator (`document_generator.py`, ~1 350 lines) produces professional HR documents from Jinja2 templates. It is accessible through the **Streamlit UI** (HR Personnel role → "Generate Document") and via the **FastAPI REST API**.
+
+### Supported Document Types
+
+| Document | Template | Description |
+|---|---|---|
+| **Offer Letter** | `templates/letters/offer_letter.html` | Employment offer with position details, salary, start date, and employee acceptance section |
+| **Termination Letter** | `templates/letters/termination_letter.html` | Formal termination notice with optional final settlement breakdown (salary, unused leave, total) |
+| **Experience Certificate** | `templates/certificates/experience_certificate.html` | "To Whom It May Concern" employment verification with tenure, role, and company seal placeholder |
+
+### Output Formats
+
+| Format | Library | Notes |
+|---|---|---|
+| **HTML** | Jinja2 | Default — rendered in-browser with live preview; saved to `generated_documents/` |
+| **DOCX** | python-docx | Structured Word document with headings, bullet lists, and signature blocks |
+| **PDF** | WeasyPrint *(primary)* or ReportLab *(fallback)* | WeasyPrint renders the full HTML/CSS; ReportLab builds the PDF programmatically if WeasyPrint is unavailable (common on Windows) |
+
+### Architecture
+
+```
+templates/                          # Jinja2 source templates
+├── letters/
+│   ├── offer_letter.html
+│   └── termination_letter.html
+├── certificates/
+│   └── experience_certificate.html
+├── contracts/                      # Reserved for future templates
+└── reports/                        # Reserved for future templates
+
+generated_documents/                # All output lands here
+├── letters/
+│   └── offer_letter_John_Doe_20260323_091500.html
+├── certificates/
+│   └── experience_certificate_Jane_20260323_091600.pdf
+├── contracts/
+└── reports/
+```
+
+**Rendering pipeline:**
+
+1. `DocumentGenerator.generate_document()` looks up the template by name from the `templates/` directory tree.
+2. Template data (employee name, salary, dates, etc.) is merged with system fields (`generation_date`, `company_name`).
+3. Jinja2 renders the HTML with custom filters (`date_format` → `%B %d, %Y`, `currency` → `$XX,XXX.XX`).
+4. Based on `output_format`:
+   - **html** → saved directly to `generated_documents/<category>/`.
+   - **docx** → content-aware builder (`add_offer_letter_content`, `add_termination_letter_content`, `add_experience_certificate_content`) creates a structured Word doc.
+   - **pdf** → HTML is converted via WeasyPrint; if unavailable, a dedicated ReportLab builder (`build_offer_letter_pdf`, etc.) constructs the PDF from the template data.
+
+### Template Variables
+
+#### Offer Letter
+
+| Variable | Type | Example |
+|---|---|---|
+| `employee_name` | string | `"John Doe"` |
+| `position_title` | string | `"Software Engineer"` |
+| `department` | string | `"Engineering"` |
+| `start_date` | date string | `"2026-04-01"` |
+| `salary` | float | `85000` |
+| `employment_type` | string | `"Full-time"` / `"Part-time"` / `"Contract"` |
+| `response_deadline` | date string | `"2026-03-30"` |
+| `hr_manager_name` | string | `"Jane Smith"` |
+| `company_name` | string | `"Adanian Labs"` |
+
+#### Termination Letter
+
+| Variable | Type | Example |
+|---|---|---|
+| `employee_name` | string | `"John Doe"` |
+| `employee_id` | string | `"EMP-001"` |
+| `position_title` | string | `"Software Engineer"` |
+| `department` | string | `"Engineering"` |
+| `termination_date` | date string | `"2026-04-30"` |
+| `last_working_day` | date string | `"2026-04-30"` |
+| `termination_reason` | string | `"Role elimination"` |
+| `hr_manager_name` | string | `"Jane Smith"` |
+| `company_name` | string | `"Adanian Labs"` |
+| `final_settlement` | bool *(optional)* | `true` — enables settlement section |
+| `final_salary` | float *(optional)* | `7083.33` |
+| `unused_leave_days` | int *(optional)* | `5` |
+| `unused_leave_amount` | float *(optional)* | `1800.00` |
+| `total_settlement` | float *(optional)* | `8883.33` |
+
+#### Experience Certificate
+
+| Variable | Type | Example |
+|---|---|---|
+| `employee_name` | string | `"John Doe"` |
+| `position_title` | string | `"Software Engineer"` |
+| `department` | string | `"Engineering"` |
+| `start_date` | date string | `"2023-01-15"` |
+| `end_date` | date string | `"2026-03-15"` |
+| `hr_manager_name` | string | `"Jane Smith"` |
+| `company_name` | string | `"Adanian Labs"` |
+| `he_she` | string | `"He"` / `"She"` / `"They"` |
+| `was_were` | string | `"was"` / `"were"` |
+
+### API Usage
+
+**Generate an offer letter (HTML):**
+
+```bash
+curl -X POST http://localhost:8000/api/documents/generate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "employee_name": "John Doe",
+    "position_title": "Software Engineer",
+    "department": "Engineering",
+    "start_date": "2026-04-01",
+    "salary": 85000,
+    "employment_type": "Full-time",
+    "response_deadline": "2026-03-30",
+    "hr_manager_name": "Jane Smith",
+    "company_name": "Adanian Labs",
+    "output_format": "html"
+  }'
+```
+
+**Generate a termination letter (DOCX):**
+
+```bash
+curl -X POST http://localhost:8000/api/documents/generate-termination \
+  -H "Content-Type: application/json" \
+  -d '{
+    "employee_name": "John Doe",
+    "employee_id": "EMP-001",
+    "position_title": "Software Engineer",
+    "department": "Engineering",
+    "termination_date": "2026-04-30",
+    "last_working_day": "2026-04-30",
+    "termination_reason": "Role elimination",
+    "hr_manager_name": "Jane Smith",
+    "company_name": "Adanian Labs",
+    "output_format": "docx"
+  }'
+```
+
+**Generate an experience certificate (PDF):**
+
+```bash
+curl -X POST http://localhost:8000/api/documents/generate-certificate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "employee_name": "John Doe",
+    "position_title": "Software Engineer",
+    "department": "Engineering",
+    "start_date": "2023-01-15",
+    "end_date": "2026-03-15",
+    "hr_manager_name": "Jane Smith",
+    "company_name": "Adanian Labs",
+    "he_she": "He",
+    "was_were": "was",
+    "output_format": "pdf"
+  }'
+```
+
+### Python Usage
+
+```python
+from document_generator import DocumentGenerator
+
+doc_gen = DocumentGenerator()
+
+# Install sample templates (first-time setup)
+doc_gen.install_sample_templates()
+
+# Generate an offer letter as HTML
+result = doc_gen.generate_document(
+    template_name="offer_letter",
+    template_data={
+        "employee_name": "John Doe",
+        "position_title": "Software Engineer",
+        "department": "Engineering",
+        "start_date": "2026-04-01",
+        "salary": 85000,
+        "employment_type": "Full-time",
+        "response_deadline": "2026-03-30",
+        "hr_manager_name": "Jane Smith",
+        "company_name": "Adanian Labs"
+    },
+    output_format="html"
+)
+
+if result["success"]:
+    print(f"Saved to: {result['path']}")
+```
+
+### Adding Custom Templates
+
+1. Create an HTML file with Jinja2 placeholders in the appropriate `templates/` subdirectory:
+
+```html
+<!-- templates/letters/promotion_letter.html -->
+<!DOCTYPE html>
+<html>
+<head><title>Promotion Letter</title></head>
+<body>
+    <h1>{{ company_name }}</h1>
+    <p>Dear {{ employee_name }},</p>
+    <p>We are pleased to inform you of your promotion to
+       <strong>{{ new_position }}</strong> effective {{ effective_date | date_format }}.</p>
+    <p>Your new salary will be {{ new_salary | currency }}.</p>
+    <p>Sincerely,<br>{{ hr_manager_name }}</p>
+</body>
+</html>
+```
+
+2. The template will automatically appear in `doc_gen.get_available_templates()` and in the Streamlit UI under its category.
+
+3. Use the built-in Jinja2 filters in your templates:
+   - `{{ some_date | date_format }}` → `March 23, 2026`
+   - `{{ amount | currency }}` → `$85,000.00`
+
+### PDF Library Setup
+
+PDF output requires one of these libraries:
+
+| Library | Install | Best For |
+|---|---|---|
+| **WeasyPrint** | `pip install weasyprint` | Full HTML/CSS fidelity — needs GTK+ on Windows |
+| **ReportLab** | `pip install reportlab` | Lightweight, no system dependencies, works everywhere |
+
+The generator auto-detects which library is available at import time. If neither is installed, HTML and DOCX output still work — only `output_format="pdf"` will return an error with installation instructions.
+
+---
+
+## �📡 API Endpoints
 
 ~30 endpoints organised into 8 categories:
 
