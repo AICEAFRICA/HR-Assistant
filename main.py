@@ -888,7 +888,7 @@ async def get_attrition_analytics(months: int = Query(12, description="Period in
     """
     if not hr_analytics:
         raise HTTPException(status_code=503, detail="HR Analytics service not available")
-    
+   
     try:
         attrition = hr_analytics.get_attrition_data(period_months=months)
         
