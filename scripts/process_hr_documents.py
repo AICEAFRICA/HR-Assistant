@@ -8,8 +8,8 @@ Processes all HR documents from Supabase storage and creates chunks with embeddi
 import os
 import logging
 from typing import List, Dict
-from knowledge_base import HRKnowledgeBaseClient
-from document_processor import process_document
+from backend.services.knowledge_base import HRKnowledgeBaseClient
+from backend.services.document_processor import process_document
 
 # Configure logging
 logging.basicConfig(

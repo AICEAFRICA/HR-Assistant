@@ -6,15 +6,15 @@ Role-based Streamlit web interface for HR RAG system with improved UI layout
 """
 import streamlit as st
 import os
-from query_router import HRQueryRouter
+from backend.services.query_router import HRQueryRouter
 from datetime import datetime, date
 import json
-from hr_dashboard import HRDashboard
+from frontend.hr_dashboard import HRDashboard
 import time
 
 # Import employee services
 try:
-    from employee_services import EmployeeServicesManager
+    from backend.services.employee_services import EmployeeServicesManager
 except ImportError:
     EmployeeServicesManager = None
 

@@ -7,7 +7,7 @@ import logging
 from typing import List, Dict, Optional
 from datetime import datetime, date, timedelta
 from supabase import Client
-from knowledge_base import HRKnowledgeBaseClient
+from .knowledge_base import HRKnowledgeBaseClient
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

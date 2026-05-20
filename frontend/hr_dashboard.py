@@ -10,8 +10,8 @@ import time
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, List
-from hr_analytics import HRAnalyticsService
-from performance_analytics import PerformanceAnalyticsService
+from backend.services.hr_analytics import HRAnalyticsService
+from backend.services.performance_analytics import PerformanceAnalyticsService
 
 class HRDashboard:
     """Live HR Dashboard with real-time analytics"""

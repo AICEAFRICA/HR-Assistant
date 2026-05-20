@@ -3,7 +3,7 @@
 Script to regenerate knowledge base with improved quality
 """
 import logging
-from knowledge_base import HRKnowledgeBaseClient
+from backend.services.knowledge_base import HRKnowledgeBaseClient
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

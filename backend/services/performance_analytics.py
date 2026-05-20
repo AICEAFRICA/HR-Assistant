@@ -8,7 +8,7 @@ from typing import List, Dict, Optional, Tuple
 from datetime import datetime, date, timedelta
 import pandas as pd
 from supabase import Client
-from knowledge_base import HRKnowledgeBaseClient
+from .knowledge_base import HRKnowledgeBaseClient
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

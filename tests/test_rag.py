@@ -3,7 +3,7 @@
 Test script for the HR RAG system
 """
 import os
-from rag_engine import HRRAGEngine
+from backend.services.rag_engine import HRRAGEngine
 
 def test_rag_system():
     """Test the RAG system with various queries"""

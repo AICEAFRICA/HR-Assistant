@@ -1,8 +1,49 @@
-/env
-.env
+# Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+env/
+venv/
+.venv/
+
+# Environment variables (never commit secrets)
+.env
+.env.local
+.env.*.local
+
+# Database dumps (contain sensitive employee data)
+data.sql
+schema.sql
+database/data.sql
+database/schema.sql
+
+# Generated output
 generated_documents/
+logs/
+*.log
+
+# SSL certificates
+nginx/ssl/
+infra/nginx/ssl/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Streamlit cache
+.streamlit/secrets.toml
 data.sql
 schema.sql
 database/data.sql

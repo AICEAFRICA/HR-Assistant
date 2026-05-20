@@ -5,8 +5,8 @@ Query Router for determining whether to use RAG or structured data queries
 import logging
 import re
 from typing import Dict, Tuple
-from rag_engine import HRRAGEngine
-from hr_analytics import HRAnalyticsService
+from .rag_engine import HRRAGEngine
+from .hr_analytics import HRAnalyticsService
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

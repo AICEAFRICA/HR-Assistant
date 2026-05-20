@@ -13,12 +13,12 @@ import os
 import logging
 from uuid import UUID
 
-from query_router import HRQueryRouter
-from employee_services import EmployeeServicesManager
-from leave_management import LeaveManagementService
-from hr_analytics import HRAnalyticsService
-from performance_analytics import PerformanceAnalyticsService
-from document_generator import DocumentGenerator
+from backend.services.query_router import HRQueryRouter
+from backend.services.employee_services import EmployeeServicesManager
+from backend.services.leave_management import LeaveManagementService
+from backend.services.hr_analytics import HRAnalyticsService
+from backend.services.performance_analytics import PerformanceAnalyticsService
+from backend.services.document_generator import DocumentGenerator
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

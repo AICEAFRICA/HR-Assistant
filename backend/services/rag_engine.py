@@ -9,7 +9,7 @@ import re
 import json
 from datetime import datetime
 import google.generativeai as genai
-from knowledge_base import HRKnowledgeBaseClient
+from .knowledge_base import HRKnowledgeBaseClient
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

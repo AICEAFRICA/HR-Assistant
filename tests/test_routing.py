@@ -1,4 +1,4 @@
-from query_router import HRQueryRouter
+from backend.services.query_router import HRQueryRouter
 import os
 
 def test_improved_routing():
